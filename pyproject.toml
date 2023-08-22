@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aioqueuerpc"
+version = "0.1.0"
+authors = [
+  { name="darkhaniop", email="darkhaniop@google.com" },
+]
+description = "JSON RPC with asyncio queues (no transport layer implementation)."
+readme = "README.md"
+requires-python = ">=3.9, <4"
+keywords = ["asyncio", "rpc"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Framework :: aiohttp",
+]
+
+dependencies = [
+  "marshmallow",
+  "msgspec>=0.18.0",
+  "pytz",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/gw-tools/aioqueuerpc"
+"Bug Tracker" = "https://github.com/gw-tools/aioqueuerpc/issues"
