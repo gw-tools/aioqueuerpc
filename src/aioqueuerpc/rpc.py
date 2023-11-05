@@ -208,7 +208,13 @@ class RpcPeer:
             queue=queue,
         )
 
-    def __init__(self, default_job_queue: asyncio.Queue = None) -> None:
+    def __init__(
+        self,
+        *,
+        default_job_queue: asyncio.Queue = None,
+        incoming_queue: asyncio.Queue = None,
+        outgoing_queue: asyncio.Queue = None,
+    ) -> None:
         if default_job_queue is not None:
             self.default_job_queue = default_job_queue
         else:
@@ -217,8 +223,12 @@ class RpcPeer:
         self._default_consumer_queue = asyncio.Queue()
         self._default_producer_queue = asyncio.Queue()
         self.n_decode_errors = 0
-        self.incoming_queue = asyncio.Queue()
-        self.outgoing_queue = asyncio.Queue()
+        if incoming_queue is None:
+            incoming_queue = asyncio.Queue()
+        self.incoming_queue = incoming_queue
+        if outgoing_queue is None:
+            outgoing_queue = asyncio.Queue()
+        self.outgoing_queue = outgoing_queue
         self.caller_methods = {}
         self.callee_methods = {}
         self.sent_rpc_requests = {}
