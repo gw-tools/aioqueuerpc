@@ -231,6 +231,8 @@ class RpcPeer:
         self.outgoing_queue = outgoing_queue
         self.caller_methods = {}
         self.callee_methods = {}
+        self.consumer_channels = {}
+        self.producer_channels = {}
         self.sent_rpc_requests = {}
         self.received_rpc_requests = {}
         self._loop = asyncio.get_running_loop()
