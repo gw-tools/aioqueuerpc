@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.2.1
+-----
+
+Date: 2024-01-08
+
+- Removed `pytz` dependency (replaced with `datetime.timezone`)
+
 0.2.0
 -----
 

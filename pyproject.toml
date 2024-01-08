@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aioqueuerpc"
-version = "0.2.0"
+version = "0.2.1"
 authors = [
   { name="darkhaniop", email="darkhaniop@google.com" },
 ]
@@ -23,7 +23,6 @@ classifiers = [
 dependencies = [
   "marshmallow",
   "msgspec>=0.18.0",
-  "pytz",
 ]
 
 [project.urls]

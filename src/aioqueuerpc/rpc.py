@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Callable, Awaitable
-from datetime import datetime
+from datetime import datetime, timezone
 import dataclasses
 import enum
 import logging
@@ -10,7 +10,6 @@ import uuid
 
 import msgspec
 from marshmallow import Schema, fields, ValidationError
-import pytz
 
 
 from .job_spec import JobError, JobSpec
@@ -281,7 +280,7 @@ class RpcPeer:
             params = {}
 
         context_id = str(uuid.uuid4())
-        message_date = datetime.now(pytz.timezone("UTC"))
+        message_date = datetime.now(timezone.utc)
         request = RpcRequest(context_id, method_name, params, RpcMsgMeta(message_date))
         try:
             request_json = method_def.request_schema.dumps(request)
@@ -412,7 +411,7 @@ class RpcPeer:
             # ignoring a possibly repeated request
             return
         if request_msg.method not in self.callee_methods:
-            message_date = datetime.now(pytz.timezone("UTC"))
+            message_date = datetime.now(timezone.utc)
             response = RpcErrorResponse(
                 request_msg.context_id,
                 RpcErrorField(500, "unknown_method", {}),
@@ -425,7 +424,7 @@ class RpcPeer:
         try:
             request: RpcRequest = method.request_schema.loads(request_msg.msg_json)
         except ValidationError as exc:
-            message_date = datetime.now(pytz.timezone("UTC"))
+            message_date = datetime.now(timezone.utc)
             response = RpcErrorResponse(
                 request_msg.context_id,
                 RpcErrorField(
@@ -454,7 +453,7 @@ class RpcPeer:
         method.job_queue.put_nowait(job)
 
     def _callee_handle_job_outcome(self, _future: asyncio.Future) -> None:
-        message_date = datetime.now(pytz.timezone("UTC"))
+        message_date = datetime.now(timezone.utc)
         request: RpcGenericMsg = self._requests_by_job_future[_future]
         del self._requests_by_job_future[_future]
         if _future.cancelled():
