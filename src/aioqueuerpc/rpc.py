@@ -272,9 +272,9 @@ class RpcPeer:
         return True
 
     async def call_rpc_method(self, method_name: str, params: Any = None) -> Any:
-        if method_name not in self.caller_methods:
-            raise RuntimeError
-        method_def = self.caller_methods[method_name]
+        # if method_name not in self.caller_methods:
+        #     raise RuntimeError
+        # method_def = self.caller_methods[method_name]
 
         if params is None:
             params = {}
@@ -283,7 +283,8 @@ class RpcPeer:
         message_date = datetime.now(timezone.utc)
         request = RpcRequest(context_id, method_name, params, RpcMsgMeta(message_date))
         try:
-            request_json = method_def.request_schema.dumps(request)
+            # request_json = method_def.request_schema.dumps(request)
+            request_json = JsonRpcRequestAbstractSchema().dumps(request)
         except Exception as e:
             raise RuntimeError from e
 
@@ -302,8 +303,11 @@ class RpcPeer:
             return
         sent_rpc_request = self.sent_rpc_requests[response_msg.context_id]
 
-        method: RpcMethodDef = self.caller_methods[sent_rpc_request.method_name]
-        response: RpcResponse = method.response_schema.loads(response_msg.msg_json)
+        # method: RpcMethodDef = self.caller_methods[sent_rpc_request.method_name]
+        # response: RpcResponse = method.response_schema.loads(response_msg.msg_json)
+        response: RpcResponse = JsonRpcResponseAbstractSchema().loads(
+            response_msg.msg_json
+        )
         sent_rpc_request.future.set_result(response.result)
 
     def handle_error_response(self, error_response_msg: RpcGenericMsg) -> None:

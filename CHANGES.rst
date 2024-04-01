@@ -1,12 +1,19 @@
 Changes
 =======
 
+0.3.0
+-----
+
+Date: 2024-04-01
+
+- Removed the need to register method by the caller.
+
 0.2.1
 -----
 
 Date: 2024-01-08
 
-- Removed `pytz` dependency (replaced with `datetime.timezone`)
+- Removed `pytz` dependency (replaced with `datetime.timezone`).
 
 0.2.0
 -----

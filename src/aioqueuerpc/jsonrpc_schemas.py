@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, INCLUDE
 from marshmallow import post_dump, post_load
 
 
@@ -77,7 +77,7 @@ class JsonRpcRequestAbstractSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
     method = fields.String(required=True)
-    params = fields.Nested(Schema(), required=True)
+    params = fields.Nested(Schema(unknown=INCLUDE), required=True)
     msg_meta = fields.Nested(JsonRpcMsgMetaPartial())
 
     @post_load
@@ -101,7 +101,7 @@ class RpcResponse:
 class JsonRpcResponseAbstractSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
-    result = fields.Nested(Schema(), required=True)
+    result = fields.Nested(Schema(unknown=INCLUDE), required=True)
     msg_meta = fields.Nested(JsonRpcMsgMetaPartial())
 
     @post_load
