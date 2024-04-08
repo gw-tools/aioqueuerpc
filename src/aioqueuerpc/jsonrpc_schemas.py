@@ -73,7 +73,7 @@ class RpcRequest:
     msg_meta: RpcMsgMeta
 
 
-class JsonRpcRequestAbstractSchema(OrderedCamelCaseSchema):
+class JsonRpcRequestSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
     method = fields.String(required=True)
@@ -98,7 +98,7 @@ class RpcResponse:
     msg_meta: RpcMsgMeta
 
 
-class JsonRpcResponseAbstractSchema(OrderedCamelCaseSchema):
+class JsonRpcResponseSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
     result = fields.Nested(Schema(unknown=INCLUDE), required=True)

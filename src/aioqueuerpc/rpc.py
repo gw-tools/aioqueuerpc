@@ -21,8 +21,8 @@ from .jsonrpc_schemas import (
     RpcErrorResponse,
     RpcNotification,
     ConstField,
-    JsonRpcRequestAbstractSchema,
-    JsonRpcResponseAbstractSchema,
+    JsonRpcRequestSchema,
+    JsonRpcResponseSchema,
     JsonRpcNotificationAbstractSchema,
     JsonRpcErrorResponseSchema,
 )
@@ -101,7 +101,7 @@ class RpcPeer:
     incoming_queue: asyncio.Queue[str]
     outgoing_queue: asyncio.Queue[str]
 
-    caller_methods: dict[str, RpcMethodDef]
+    # caller_methods: dict[str, RpcMethodDef]
     callee_methods: dict[str, RpcMethodDef]
 
     consumer_channels: dict[str, RpcChannelDef]
@@ -132,7 +132,7 @@ class RpcPeer:
         if isinstance(params_schema, type):
             params_schema = params_schema()
 
-        class _MethodRequestSchema(JsonRpcRequestAbstractSchema):
+        class _MethodRequestSchema(JsonRpcRequestSchema):
             method = ConstField(name)
             params = fields.Nested(params_schema)
 
@@ -141,12 +141,12 @@ class RpcPeer:
 
         if isinstance(result_schema, fields.Field):
 
-            class _MethodResponseSchema(JsonRpcResponseAbstractSchema):
+            class _MethodResponseSchema(JsonRpcResponseSchema):
                 result = result_schema
 
         elif isinstance(result_schema, Schema):
 
-            class _MethodResponseSchema(JsonRpcResponseAbstractSchema):
+            class _MethodResponseSchema(JsonRpcResponseSchema):
                 result = fields.Nested(result_schema, required=True)
 
         else:
@@ -228,7 +228,7 @@ class RpcPeer:
         if outgoing_queue is None:
             outgoing_queue = asyncio.Queue()
         self.outgoing_queue = outgoing_queue
-        self.caller_methods = {}
+        # self.caller_methods = {}
         self.callee_methods = {}
         self.consumer_channels = {}
         self.producer_channels = {}
@@ -262,14 +262,14 @@ class RpcPeer:
         )
         return True
 
-    def register_caller_method(self, name, params_schema, result_schema) -> bool:
-        if name in self.caller_methods:
-            return False
+    # def register_caller_method(self, name, params_schema, result_schema) -> bool:
+    #     if name in self.caller_methods:
+    #         return False
 
-        self.caller_methods[name] = self._create_rpc_method_def(
-            name=name, params_schema=params_schema, result_schema=result_schema
-        )
-        return True
+    #     self.caller_methods[name] = self._create_rpc_method_def(
+    #         name=name, params_schema=params_schema, result_schema=result_schema
+    #     )
+    #     return True
 
     async def call_rpc_method(self, method_name: str, params: Any = None) -> Any:
         # if method_name not in self.caller_methods:
@@ -284,7 +284,7 @@ class RpcPeer:
         request = RpcRequest(context_id, method_name, params, RpcMsgMeta(message_date))
         try:
             # request_json = method_def.request_schema.dumps(request)
-            request_json = JsonRpcRequestAbstractSchema().dumps(request)
+            request_json = JsonRpcRequestSchema().dumps(request)
         except Exception as e:
             raise RuntimeError from e
 
@@ -305,9 +305,7 @@ class RpcPeer:
 
         # method: RpcMethodDef = self.caller_methods[sent_rpc_request.method_name]
         # response: RpcResponse = method.response_schema.loads(response_msg.msg_json)
-        response: RpcResponse = JsonRpcResponseAbstractSchema().loads(
-            response_msg.msg_json
-        )
+        response: RpcResponse = JsonRpcResponseSchema().loads(response_msg.msg_json)
         sent_rpc_request.future.set_result(response.result)
 
     def handle_error_response(self, error_response_msg: RpcGenericMsg) -> None:
