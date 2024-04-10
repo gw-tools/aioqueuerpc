@@ -100,6 +100,7 @@ class RpcError(Exception):
 class RpcPeer:
     incoming_queue: asyncio.Queue[str]
     outgoing_queue: asyncio.Queue[str]
+    passthrough_queue: asyncio.Queue[str]
 
     callee_methods: dict[str, RpcMethodDef]
 
@@ -212,6 +213,7 @@ class RpcPeer:
         default_job_queue: asyncio.Queue = None,
         incoming_queue: asyncio.Queue = None,
         outgoing_queue: asyncio.Queue = None,
+        passthrough_queue: asyncio.Queue = None,
     ) -> None:
         if default_job_queue is not None:
             self.default_job_queue = default_job_queue
@@ -227,6 +229,7 @@ class RpcPeer:
         if outgoing_queue is None:
             outgoing_queue = asyncio.Queue()
         self.outgoing_queue = outgoing_queue
+        self.passthrough_queue = passthrough_queue
         self.callee_methods = {}
         self.consumer_channels = {}
         self.producer_channels = {}
@@ -237,11 +240,11 @@ class RpcPeer:
         self._requests_by_job_future = {}
 
         self.handlers_by_msg_type = {
-            MsgTypes.ERROR_RESPONSE: self.handle_error_response,
-            MsgTypes.RESPONSE: self.handle_response,
-            MsgTypes.REQUEST: self.callee_handle_request,
-            MsgTypes.NOTIFICATION: self.handle_incoming_notify,
-            MsgTypes.UNKNOWN: self.handle_unknown,
+            MsgTypes.ERROR_RESPONSE: self._handle_error_response,
+            MsgTypes.RESPONSE: self._handle_response,
+            MsgTypes.REQUEST: self._callee_handle_request,
+            MsgTypes.NOTIFICATION: self._handle_incoming_notify,
+            MsgTypes.UNKNOWN: self._handle_unknown,
         }
 
     def register_callee_method(
@@ -281,7 +284,7 @@ class RpcPeer:
         )
         return await future
 
-    def handle_response(self, response_msg: RpcGenericMsg) -> None:
+    def _handle_response(self, response_msg: RpcGenericMsg) -> None:
         if response_msg.context_id not in self.sent_rpc_requests:
             # unknown request
             return
@@ -290,7 +293,7 @@ class RpcPeer:
         response: RpcResponse = JsonRpcResponseSchema().loads(response_msg.msg_json)
         sent_rpc_request.future.set_result(response.result)
 
-    def handle_error_response(self, error_response_msg: RpcGenericMsg) -> None:
+    def _handle_error_response(self, error_response_msg: RpcGenericMsg) -> None:
         if error_response_msg.context_id not in self.sent_rpc_requests:
             # unknown request
             return
@@ -376,7 +379,7 @@ class RpcPeer:
     def route_by_type(self, generic_msg: RpcGenericMsg) -> None:
         self.handlers_by_msg_type[generic_msg.msg_type](generic_msg)
 
-    def handle_incoming_notify(self, notify_msg: RpcGenericMsg) -> None:
+    def _handle_incoming_notify(self, notify_msg: RpcGenericMsg) -> None:
         if notify_msg.method not in self.consumer_channels:
             # unknown notification type
             return
@@ -384,11 +387,13 @@ class RpcPeer:
         notification = channel.notification_schema.loads(notify_msg.msg_json)
         channel.queue.put_nowait(notification["params"])
 
-    def handle_unknown(self, unknown_msg: RpcGenericMsg) -> None:
+    def _handle_unknown(self, unknown_msg: RpcGenericMsg) -> None:
         log_msg = f"Cannot determine message type:\n{unknown_msg.msg_json}"
         self._logger.error(log_msg)
+        if self.passthrough_queue:
+            self.passthrough_queue.put_nowait(unknown_msg)
 
-    def callee_handle_request(self, request_msg: RpcGenericMsg) -> None:
+    def _callee_handle_request(self, request_msg: RpcGenericMsg) -> None:
         log_msg = f"callee_handle_request: {request_msg}"
         self._logger.debug(log_msg)
         if request_msg.context_id in self.received_rpc_requests:
