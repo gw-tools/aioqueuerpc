@@ -120,7 +120,7 @@ class RpcPeer:
         name: str,
         *,
         params_schema: Schema,
-        result_schema: Schema,
+        result_schema: Schema = None,
         coro: Callable[[Any], Awaitable[Any]] = None,
         job_queue: asyncio.Queue = None,
     ) -> RpcMethodDef:
@@ -136,33 +136,33 @@ class RpcPeer:
             method = ConstField(name)
             params = fields.Nested(params_schema)
 
-        if isinstance(result_schema, type):
-            result_schema = result_schema()
+        # if isinstance(result_schema, type):
+        #     result_schema = result_schema()
 
-        if isinstance(result_schema, fields.Field):
+        # if isinstance(result_schema, fields.Field):
 
-            class _MethodResponseSchema(JsonRpcResponseSchema):
-                result = result_schema
+        #     class _MethodResponseSchema(JsonRpcResponseSchema):
+        #         result = result_schema
 
-        elif isinstance(result_schema, Schema):
+        # elif isinstance(result_schema, Schema):
 
-            class _MethodResponseSchema(JsonRpcResponseSchema):
-                result = fields.Nested(result_schema, required=True)
+        #     class _MethodResponseSchema(JsonRpcResponseSchema):
+        #         result = fields.Nested(result_schema, required=True)
 
-        else:
-            raise RuntimeError(
-                (
-                    f"Error creating '{name}' method definition. Unsupported\n"
-                    f"type(result_schema)='{type(result_schema)}'. Must be one of:\n"
-                    "  fields.Field\n"
-                    "  Schema"
-                )
-            )
+        # else:
+        #     raise RuntimeError(
+        #         (
+        #             f"Error creating '{name}' method definition. Unsupported\n"
+        #             f"type(result_schema)='{type(result_schema)}'. Must be one of:\n"
+        #             "  fields.Field\n"
+        #             "  Schema"
+        #         )
+        #     )
 
         return RpcMethodDef(
             name=name,
             request_schema=_MethodRequestSchema(),
-            response_schema=_MethodResponseSchema(),
+            response_schema=None,  # _MethodResponseSchema(),
             coro=coro,
             job_queue=job_queue,
         )
@@ -411,7 +411,8 @@ class RpcPeer:
             return
         method = self.callee_methods[request_msg.method]
         try:
-            request: RpcRequest = method.request_schema.loads(request_msg.msg_json)
+            # request: RpcRequest = method.request_schema.loads(request_msg.msg_json)
+            request: RpcRequest = JsonRpcRequestSchema().loads(request_msg.msg_json)
         except ValidationError as exc:
             message_date = datetime.now(timezone.utc)
             response = RpcErrorResponse(
@@ -467,11 +468,12 @@ class RpcPeer:
             return
 
         # reply with RpcResponse
-        method = self.callee_methods[request.method]
         response = RpcResponse(
             context_id=request.context_id,
             result=_future.result(),
             msg_meta=RpcMsgMeta(message_date),
         )
-        response_json = method.response_schema.dumps(response)
+        # method = self.callee_methods[request.method]
+        # response_json = method.response_schema.dumps(response)
+        response_json = JsonRpcResponseSchema().dumps(response)
         self.outgoing_queue.put_nowait(response_json)

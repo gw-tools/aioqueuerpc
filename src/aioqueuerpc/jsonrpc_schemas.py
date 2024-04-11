@@ -101,7 +101,7 @@ class RpcResponse:
 class JsonRpcResponseSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
-    result = fields.Nested(Schema(unknown=INCLUDE), required=True)
+    result = fields.Field(allow_none=True, required=True)
     msg_meta = fields.Nested(JsonRpcMsgMetaPartial())
 
     @post_load
