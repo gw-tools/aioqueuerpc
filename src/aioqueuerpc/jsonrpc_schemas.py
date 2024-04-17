@@ -77,7 +77,7 @@ class JsonRpcRequestSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     context_id = fields.String(required=True, data_key="id")
     method = fields.String(required=True)
-    params = fields.Nested(Schema(unknown=INCLUDE), required=True)
+    params = fields.Field(required=True, allow_none=True)
     msg_meta = fields.Nested(JsonRpcMsgMetaPartial())
 
     @post_load

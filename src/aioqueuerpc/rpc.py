@@ -9,7 +9,7 @@ import uuid
 
 
 import msgspec
-from marshmallow import Schema, fields, ValidationError
+from marshmallow import Schema, fields
 
 
 from .job_spec import JobError, JobSpec
@@ -119,22 +119,22 @@ class RpcPeer:
     def _create_rpc_method_def(
         name: str,
         *,
-        params_schema: Schema,
+        params_schema: Schema = None,
         result_schema: Schema = None,
         coro: Callable[[Any], Awaitable[Any]] = None,
         job_queue: asyncio.Queue = None,
     ) -> RpcMethodDef:
         """Creates the RpcMethodDef instance"""
 
-        if params_schema is None:
-            params_schema = Schema()
+        # if params_schema is None:
+        #     params_schema = Schema()
 
-        if isinstance(params_schema, type):
-            params_schema = params_schema()
+        # if isinstance(params_schema, type):
+        #     params_schema = params_schema()
 
-        class _MethodRequestSchema(JsonRpcRequestSchema):
-            method = ConstField(name)
-            params = fields.Nested(params_schema)
+        # class _MethodRequestSchema(JsonRpcRequestSchema):
+        #     method = ConstField(name)
+        #     params = fields.Nested(params_schema)
 
         # if isinstance(result_schema, type):
         #     result_schema = result_schema()
@@ -161,7 +161,7 @@ class RpcPeer:
 
         return RpcMethodDef(
             name=name,
-            request_schema=_MethodRequestSchema(),
+            request_schema=None,  # _MethodRequestSchema(),
             response_schema=None,  # _MethodResponseSchema(),
             coro=coro,
             job_queue=job_queue,
@@ -263,6 +263,21 @@ class RpcPeer:
         )
         return True
 
+    def register_method(self, name, coro, job_queue: asyncio.Queue = None) -> bool:
+        if name in self.callee_methods:
+            return False
+        if job_queue is None:
+            job_queue = self.default_job_queue
+
+        self.callee_methods[name] = RpcMethodDef(
+            name=name,
+            request_schema=None,
+            response_schema=None,
+            coro=coro,
+            job_queue=job_queue,
+        )
+        return True
+
     async def call_rpc_method(self, method_name: str, params: Any = None) -> Any:
         if params is None:
             params = {}
@@ -283,6 +298,9 @@ class RpcPeer:
             context_id, method_name, params, future
         )
         return await future
+
+    async def call(self, method_name: str, **kwargs) -> Any:
+        return await self.call_rpc_method(method_name, params=kwargs)
 
     def _handle_response(self, response_msg: RpcGenericMsg) -> None:
         if response_msg.context_id not in self.sent_rpc_requests:
@@ -413,7 +431,7 @@ class RpcPeer:
         try:
             # request: RpcRequest = method.request_schema.loads(request_msg.msg_json)
             request: RpcRequest = JsonRpcRequestSchema().loads(request_msg.msg_json)
-        except ValidationError as exc:
+        except Exception as exc:
             message_date = datetime.now(timezone.utc)
             response = RpcErrorResponse(
                 request_msg.context_id,
