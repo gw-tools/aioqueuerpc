@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 
-from marshmallow import Schema, fields, validate, INCLUDE
+from marshmallow import Schema, fields, validate
 from marshmallow import post_dump, post_load
 
 
@@ -159,10 +159,10 @@ class RpcNotification:
     params: Any
 
 
-class JsonRpcNotificationAbstractSchema(OrderedCamelCaseSchema):
+class JsonRpcNotificationSchema(OrderedCamelCaseSchema):
     jsonrpc = ConstField("2.0")
     method = fields.String(required=True)
-    params = fields.Nested(Schema(), required=True)
+    params = fields.Field(allow_none=True, required=True)
 
     @post_load
     def make_notification_object(self, data: dict, **_kwargs) -> RpcNotification:

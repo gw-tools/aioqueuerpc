@@ -9,7 +9,6 @@ import uuid
 
 
 import msgspec
-from marshmallow import Schema, fields
 
 
 from .job_spec import JobError, JobSpec
@@ -23,7 +22,7 @@ from .jsonrpc_schemas import (
     ConstField,
     JsonRpcRequestSchema,
     JsonRpcResponseSchema,
-    JsonRpcNotificationAbstractSchema,
+    JsonRpcNotificationSchema,
     JsonRpcErrorResponseSchema,
 )
 
@@ -59,8 +58,8 @@ def detect_rpc_msg_type(msg: MsgSpecRpcCommonFields) -> MsgTypes:
 @dataclasses.dataclass
 class RpcMethodDef:
     name: str
-    request_schema: Schema
-    response_schema: Schema
+    request_schema: Any = None
+    response_schema: Any = None
     coro: Callable[[Any], Awaitable[Any]] = None
     job_queue: asyncio.Queue = None
 
@@ -68,8 +67,8 @@ class RpcMethodDef:
 @dataclasses.dataclass
 class RpcChannelDef:
     name: str
-    notification_schema: Schema
-    queue: asyncio.Queue
+    notification_schema: Any = None
+    queue: asyncio.Queue = None
 
 
 @dataclasses.dataclass
@@ -119,8 +118,8 @@ class RpcPeer:
     def _create_rpc_method_def(
         name: str,
         *,
-        params_schema: Schema = None,
-        result_schema: Schema = None,
+        params_schema: Any = None,
+        result_schema: Any = None,
         coro: Callable[[Any], Awaitable[Any]] = None,
         job_queue: asyncio.Queue = None,
     ) -> RpcMethodDef:
@@ -171,39 +170,39 @@ class RpcPeer:
     def _create_rpc_channel_def(
         name: str,
         *,
-        params_schema: Schema,
+        params_schema: Any = None,
         queue: asyncio.Queue = None,
     ) -> RpcChannelDef:
         """Creates the RpcChannelDef instance"""
 
-        if isinstance(params_schema, type):
-            params_schema = params_schema()
+        # if isinstance(params_schema, type):
+        #     params_schema = params_schema()
 
-        if isinstance(params_schema, fields.Field):
+        # if isinstance(params_schema, fields.Field):
 
-            class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
-                method = ConstField(name)
-                params = params_schema
+        #     class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
+        #         method = ConstField(name)
+        #         params = params_schema
 
-        elif isinstance(params_schema, Schema):
+        # elif isinstance(params_schema, Schema):
 
-            class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
-                method = ConstField(name)
-                params = fields.Nested(params_schema, required=True)
+        #     class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
+        #         method = ConstField(name)
+        #         params = fields.Nested(params_schema, required=True)
 
-        else:
-            raise RuntimeError(
-                (
-                    f"Error creating '{name}' channel definition. Unsupported\n"
-                    f"type(params_schema)='{type(params_schema)}'. Must be one of:\n"
-                    "  fields.Field\n"
-                    "  Schema"
-                )
-            )
+        # else:
+        #     raise RuntimeError(
+        #         (
+        #             f"Error creating '{name}' channel definition. Unsupported\n"
+        #             f"type(params_schema)='{type(params_schema)}'. Must be one of:\n"
+        #             "  fields.Field\n"
+        #             "  Schema"
+        #         )
+        #     )
 
         return RpcChannelDef(
             name=name,
-            notification_schema=_MethodNotificationSchema(),
+            notification_schema=None,  # _MethodNotificationSchema(),
             queue=queue,
         )
 
@@ -323,7 +322,7 @@ class RpcPeer:
         sent_rpc_request.future.set_exception(RpcError(error_response.error))
 
     def register_producer(
-        self, name: str, params_schema: Schema, queue: asyncio.Queue = None
+        self, name: str, params_schema: Any = None, queue: asyncio.Queue = None
     ) -> bool:
         if name in self.producer_channels:
             return False
@@ -337,7 +336,7 @@ class RpcPeer:
         return True
 
     def register_consumer(
-        self, name: str, params_schema: Schema, queue: asyncio.Queue = None
+        self, name: str, params_schema: Any = None, queue: asyncio.Queue = None
     ) -> bool:
         if name in self.consumer_channels:
             return False
@@ -363,9 +362,13 @@ class RpcPeer:
         if channel_name not in self.producer_channels:
             return
         channel = self.producer_channels[channel_name]
+        notification_schema = JsonRpcNotificationSchema()
         while True:
             frame = await channel.queue.get()
-            msg_json = channel.notification_schema.dumps(
+            # msg_json = channel.notification_schema.dumps(
+            #     RpcNotification(method=channel_name, params=frame)
+            # )
+            msg_json = notification_schema.dumps(
                 RpcNotification(method=channel_name, params=frame)
             )
             await self.outgoing_queue.put(msg_json)
@@ -374,7 +377,11 @@ class RpcPeer:
         if channel_name not in self.producer_channels:
             return
         channel = self.producer_channels[channel_name]
-        msg_json = channel.notification_schema.dumps(
+        notification_schema = JsonRpcNotificationSchema()
+        # msg_json = channel.notification_schema.dumps(
+        #     RpcNotification(method=channel_name, params=frame)
+        # )
+        msg_json = notification_schema.dumps(
             RpcNotification(method=channel_name, params=frame)
         )
         self.outgoing_queue.put_nowait(msg_json)
@@ -401,8 +408,10 @@ class RpcPeer:
         if notify_msg.method not in self.consumer_channels:
             # unknown notification type
             return
+        notification_schema = JsonRpcNotificationSchema()
         channel = self.consumer_channels[notify_msg.method]
-        notification = channel.notification_schema.loads(notify_msg.msg_json)
+        # notification = channel.notification_schema.loads(notify_msg.msg_json)
+        notification = notification_schema.loads(notify_msg.msg_json)
         channel.queue.put_nowait(notification["params"])
 
     def _handle_unknown(self, unknown_msg: RpcGenericMsg) -> None:
