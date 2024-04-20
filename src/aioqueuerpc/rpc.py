@@ -19,7 +19,6 @@ from .jsonrpc_schemas import (
     RpcErrorField,
     RpcErrorResponse,
     RpcNotification,
-    ConstField,
     JsonRpcRequestSchema,
     JsonRpcResponseSchema,
     JsonRpcNotificationSchema,
@@ -114,98 +113,6 @@ class RpcPeer:
     default_job_queue: asyncio.Queue[JobSpec]
     _requests_by_job_future: dict[asyncio.Future, RpcGenericMsg]
 
-    @staticmethod
-    def _create_rpc_method_def(
-        name: str,
-        *,
-        params_schema: Any = None,
-        result_schema: Any = None,
-        coro: Callable[[Any], Awaitable[Any]] = None,
-        job_queue: asyncio.Queue = None,
-    ) -> RpcMethodDef:
-        """Creates the RpcMethodDef instance"""
-
-        # if params_schema is None:
-        #     params_schema = Schema()
-
-        # if isinstance(params_schema, type):
-        #     params_schema = params_schema()
-
-        # class _MethodRequestSchema(JsonRpcRequestSchema):
-        #     method = ConstField(name)
-        #     params = fields.Nested(params_schema)
-
-        # if isinstance(result_schema, type):
-        #     result_schema = result_schema()
-
-        # if isinstance(result_schema, fields.Field):
-
-        #     class _MethodResponseSchema(JsonRpcResponseSchema):
-        #         result = result_schema
-
-        # elif isinstance(result_schema, Schema):
-
-        #     class _MethodResponseSchema(JsonRpcResponseSchema):
-        #         result = fields.Nested(result_schema, required=True)
-
-        # else:
-        #     raise RuntimeError(
-        #         (
-        #             f"Error creating '{name}' method definition. Unsupported\n"
-        #             f"type(result_schema)='{type(result_schema)}'. Must be one of:\n"
-        #             "  fields.Field\n"
-        #             "  Schema"
-        #         )
-        #     )
-
-        return RpcMethodDef(
-            name=name,
-            request_schema=None,  # _MethodRequestSchema(),
-            response_schema=None,  # _MethodResponseSchema(),
-            coro=coro,
-            job_queue=job_queue,
-        )
-
-    @staticmethod
-    def _create_rpc_channel_def(
-        name: str,
-        *,
-        params_schema: Any = None,
-        queue: asyncio.Queue = None,
-    ) -> RpcChannelDef:
-        """Creates the RpcChannelDef instance"""
-
-        # if isinstance(params_schema, type):
-        #     params_schema = params_schema()
-
-        # if isinstance(params_schema, fields.Field):
-
-        #     class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
-        #         method = ConstField(name)
-        #         params = params_schema
-
-        # elif isinstance(params_schema, Schema):
-
-        #     class _MethodNotificationSchema(JsonRpcNotificationAbstractSchema):
-        #         method = ConstField(name)
-        #         params = fields.Nested(params_schema, required=True)
-
-        # else:
-        #     raise RuntimeError(
-        #         (
-        #             f"Error creating '{name}' channel definition. Unsupported\n"
-        #             f"type(params_schema)='{type(params_schema)}'. Must be one of:\n"
-        #             "  fields.Field\n"
-        #             "  Schema"
-        #         )
-        #     )
-
-        return RpcChannelDef(
-            name=name,
-            notification_schema=None,  # _MethodNotificationSchema(),
-            queue=queue,
-        )
-
     def __init__(
         self,
         *,
@@ -245,22 +152,6 @@ class RpcPeer:
             MsgTypes.NOTIFICATION: self._handle_incoming_notify,
             MsgTypes.UNKNOWN: self._handle_unknown,
         }
-
-    def register_callee_method(
-        self, name, params_schema, result_schema, coro, job_queue: asyncio.Queue = None
-    ) -> bool:
-        if name in self.callee_methods:
-            return False
-        if job_queue is None:
-            job_queue = self.default_job_queue
-        self.callee_methods[name] = self._create_rpc_method_def(
-            name=name,
-            params_schema=params_schema,
-            result_schema=result_schema,
-            coro=coro,
-            job_queue=job_queue,
-        )
-        return True
 
     def register_method(self, name, coro, job_queue: asyncio.Queue = None) -> bool:
         if name in self.callee_methods:
@@ -321,31 +212,29 @@ class RpcPeer:
         )
         sent_rpc_request.future.set_exception(RpcError(error_response.error))
 
-    def register_producer(
-        self, name: str, params_schema: Any = None, queue: asyncio.Queue = None
-    ) -> bool:
+    def register_producer(self, name: str, queue: asyncio.Queue = None) -> bool:
         if name in self.producer_channels:
             return False
 
         if queue is None:
             queue = self._default_producer_queue
 
-        self.producer_channels[name] = self._create_rpc_channel_def(
-            name=name, params_schema=params_schema, queue=queue
+        self.producer_channels[name] = RpcChannelDef(
+            name=name,
+            queue=queue,
         )
         return True
 
-    def register_consumer(
-        self, name: str, params_schema: Any = None, queue: asyncio.Queue = None
-    ) -> bool:
+    def register_consumer(self, name: str, queue: asyncio.Queue = None) -> bool:
         if name in self.consumer_channels:
             return False
 
         if queue is None:
             queue = self._default_consumer_queue
 
-        self.consumer_channels[name] = self._create_rpc_channel_def(
-            name=name, params_schema=params_schema, queue=queue
+        self.consumer_channels[name] = RpcChannelDef(
+            name=name,
+            queue=queue,
         )
         return True
 
@@ -365,9 +254,6 @@ class RpcPeer:
         notification_schema = JsonRpcNotificationSchema()
         while True:
             frame = await channel.queue.get()
-            # msg_json = channel.notification_schema.dumps(
-            #     RpcNotification(method=channel_name, params=frame)
-            # )
             msg_json = notification_schema.dumps(
                 RpcNotification(method=channel_name, params=frame)
             )
@@ -378,9 +264,6 @@ class RpcPeer:
             return
         channel = self.producer_channels[channel_name]
         notification_schema = JsonRpcNotificationSchema()
-        # msg_json = channel.notification_schema.dumps(
-        #     RpcNotification(method=channel_name, params=frame)
-        # )
         msg_json = notification_schema.dumps(
             RpcNotification(method=channel_name, params=frame)
         )
@@ -410,7 +293,6 @@ class RpcPeer:
             return
         notification_schema = JsonRpcNotificationSchema()
         channel = self.consumer_channels[notify_msg.method]
-        # notification = channel.notification_schema.loads(notify_msg.msg_json)
         notification = notification_schema.loads(notify_msg.msg_json)
         channel.queue.put_nowait(notification["params"])
 
@@ -438,7 +320,6 @@ class RpcPeer:
             return
         method = self.callee_methods[request_msg.method]
         try:
-            # request: RpcRequest = method.request_schema.loads(request_msg.msg_json)
             request: RpcRequest = JsonRpcRequestSchema().loads(request_msg.msg_json)
         except Exception as exc:
             message_date = datetime.now(timezone.utc)
@@ -500,7 +381,5 @@ class RpcPeer:
             result=_future.result(),
             msg_meta=RpcMsgMeta(message_date),
         )
-        # method = self.callee_methods[request.method]
-        # response_json = method.response_schema.dumps(response)
         response_json = JsonRpcResponseSchema().dumps(response)
         self.outgoing_queue.put_nowait(response_json)
