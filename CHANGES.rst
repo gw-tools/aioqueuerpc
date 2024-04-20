@@ -1,12 +1,21 @@
 Changes
 =======
 
+0.4.0
+-----
+
+Date: 2024-04-20
+
+- Removed the need to define schemas when registering methods.
+- Removed the need to define schemas when registering consumers and producers.
+- Removed deprecated methods.
+
 0.3.0
 -----
 
 Date: 2024-04-01
 
-- Removed the need to register method by the caller.
+- Removed the need to register methods by the caller.
 
 0.2.1
 -----
