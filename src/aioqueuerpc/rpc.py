@@ -260,9 +260,6 @@ class RpcPeer:
             await self.outgoing_queue.put(msg_json)
 
     def publish_one(self, channel_name: str, frame: Any) -> None:
-        if channel_name not in self.producer_channels:
-            return
-        channel = self.producer_channels[channel_name]
         notification_schema = JsonRpcNotificationSchema()
         msg_json = notification_schema.dumps(
             RpcNotification(method=channel_name, params=frame)
