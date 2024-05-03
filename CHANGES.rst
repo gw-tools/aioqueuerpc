@@ -1,6 +1,13 @@
 Changes
 =======
 
+0.4.1
+-----
+
+Date: 2024-05-03
+
+- Added async RpcPeer.run() method that processes messages and runs the default worker loop.
+
 0.4.0
 -----
 
