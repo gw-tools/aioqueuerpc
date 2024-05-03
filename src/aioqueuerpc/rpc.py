@@ -24,6 +24,7 @@ from .jsonrpc_schemas import (
     JsonRpcNotificationSchema,
     JsonRpcErrorResponseSchema,
 )
+from .worker import Worker
 
 
 class MsgTypes(enum.Enum):
@@ -112,6 +113,7 @@ class RpcPeer:
 
     default_job_queue: asyncio.Queue[JobSpec]
     _requests_by_job_future: dict[asyncio.Future, RpcGenericMsg]
+    _default_worker: Worker
 
     def __init__(
         self,
@@ -246,6 +248,28 @@ class RpcPeer:
                 self.n_decode_errors += 1
                 continue
             self.route_by_type(generic_msg)
+
+    async def run(self) -> None:
+        self._default_worker = Worker(job_queue=self.default_job_queue)
+        self._default_worker_task = asyncio.create_task(
+            self._default_worker.run(), name="_default_worker.run"
+        )
+        self._loop_process_task = asyncio.create_task(
+            self.loop_process_incoming(), name="_loop_process_incoming"
+        )
+        try:
+            while True:
+                await asyncio.sleep(15)
+        except asyncio.CancelledError:
+            pass
+
+        root_tasks = [self._default_worker_task, self._loop_process_task]
+        for task in root_tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*root_tasks)
+        except asyncio.CancelledError:
+            pass
 
     async def publish_loop(self, channel_name: str) -> None:
         if channel_name not in self.producer_channels:
